@@ -1,7 +1,21 @@
 stages:
   - meta
+  - test
   - build
-  - kaniko_build
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+    - when: never
+
+unit_tests:
+  stage: test
+  image: python:3.12-alpine
+  script:
+    - pip install --no-cache-dir -e .
+    - pip install --no-cache-dir pytest
+    - pytest -v
 
 meta:
   stage: meta
