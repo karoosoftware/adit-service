@@ -11,6 +11,7 @@ data "tls_certificate" "gitlab" {
   url = local.gitlab_issuer_url
 }
 
+
 resource "aws_iam_openid_connect_provider" "gitlab" {
   url            = local.gitlab_issuer_url
   client_id_list = [local.gitlab_audience]
