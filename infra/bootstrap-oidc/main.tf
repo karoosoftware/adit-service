@@ -7,7 +7,6 @@ locals {
 }
 
 # Terraform needs thumbprint_list for this resource; we can fetch the cert chain and compute it.
-# AWS recommends verifying the thumbprint; this matches that model. :contentReference[oaicite:0]{index=0}
 data "tls_certificate" "gitlab" {
   url = local.gitlab_issuer_url
 }

@@ -17,7 +17,7 @@ oidc_smoke_preprod:
   before_script:
     - apk add --no-cache aws-cli jq
   script:
-    - echo "Assuming role: ${AWS_ROLE_ARN}"
+    - echo "Assuming role - ${AWS_ROLE_ARN}"
     - |
       CREDS_JSON="$(aws sts assume-role-with-web-identity \
         --role-arn "${AWS_ROLE_ARN}" \
@@ -45,7 +45,7 @@ oidc_smoke_prod:
   before_script:
     - apk add --no-cache aws-cli jq
   script:
-    - echo "Assuming role: ${AWS_ROLE_ARN}"
+    - echo "Assuming role -  ${AWS_ROLE_ARN}"
     - |
       CREDS_JSON="$(aws sts assume-role-with-web-identity \
         --role-arn "${AWS_ROLE_ARN}" \
