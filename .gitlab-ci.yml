@@ -1,9 +1,31 @@
 stages:
-  - test
+  - meta
+  - build
 
-hello_ci:
-  stage: test
-  image: alpine:3.20
+meta:
+  image: python:3.12-alpine
   script:
-    - echo "✅ GitLab CI is running for commit ${CI_COMMIT_SHORT_SHA}"
-    - echo "Branch - ${CI_COMMIT_REF_NAME}"
+    - |
+      python - <<'PY' > build.env
+      import tomllib
+      p = tomllib.load(open("pyproject.toml","rb"))["project"]
+      print(f"APP_NAME={p['name']}")
+      print(f"VERSION={p['version']}")
+      PY
+    - cat build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+
+
+docker_build:
+  stage: build
+  image: docker:27
+  services:
+    - name: docker:27-dind
+      command: ["--tls-false"]
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker version
+    - docker build -f docker/Dockerfile -t ${APP_NAMEE}:${VERSION} .
