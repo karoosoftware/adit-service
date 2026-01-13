@@ -27,6 +27,8 @@ docker_build:
       command: ["--tls-false"]
   variables:
     DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: tcp://docker:2375
+    privileged: true
   script:
     - docker version
     - docker build -f docker/Dockerfile -t ${APP_NAMEE}:${VERSION} .
