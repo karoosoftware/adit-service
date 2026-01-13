@@ -126,9 +126,46 @@ You should see the same responses as when running locally.
 
 ---
 
-## CI/CD (Coming Soon)
+## CI/CD
 
-Planned additions:
+This project is designed to be built and deployed using **GitLab CI/CD**.
+
+### Planned additions
 - Automated container builds
 - Smoke tests against the running container
-- Integration with CI pipelines GitLab
+- Deployment via GitLab CI pipelines (e.g. pushing images to Amazon ECR)
+
+---
+
+## Local GitLab Access & Manual Sync
+
+This repository is hosted primarily on GitHub.  
+GitLab is currently used **only for CI/CD**.
+
+> ⚠️ A GitHub → GitLab mirror has **not yet been configured**.  
+> Until mirroring is in place, changes must be **manually synced** to GitLab to trigger CI pipelines.
+
+---
+
+### Prerequisites
+
+- A **GitLab Personal Access Token** with:
+    - `read_repository`
+    - `write_repository`
+
+### Add GitLab as a remote
+
+From the root of the repository:
+
+```bash
+git remote add gitlab https://oauth2:<YOUR_GITLAB_TOKEN>@gitlab.com/karoosoftware-group/adit-service.git
+git remote -v
+```
+
+### Manual sync workflow (until mirroring is enabled)
+
+To ensure GitLab CI runs on the latest code:
+```bash
+git pull origin main
+git push gitlab main
+```
