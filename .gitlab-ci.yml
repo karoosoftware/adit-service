@@ -5,5 +5,5 @@ hello_ci:
   stage: test
   image: alpine:3.20
   script:
-    - echo "✅ GitLab CI is running for commit $CI_COMMIT_SHORT_SHA"
-    - echo "Branch - $CI_COMMIT_REF_NAME"
+    - echo "✅ GitLab CI is running for commit ${CI_COMMIT_SHORT_SHA}"
+    - echo "Branch - ${CI_COMMIT_REF_NAME}"
