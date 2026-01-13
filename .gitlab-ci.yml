@@ -1,46 +1,10 @@
-stages:
-  - meta
-  - test
-  - build
-
-workflow:
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      when: always
-    - when: never
-
-unit_tests:
-  stage: test
-  image: python:3.12-alpine
-  script:
-    - pip install --no-cache-dir -e .
-    - pip install --no-cache-dir pytest
-    - pytest -v
-
-meta:
-  stage: meta
-  image: python:3.12-alpine
-  script:
-    - |
-      python - <<'PY' > build.env
-      import tomllib
-      p = tomllib.load(open("pyproject.toml","rb"))["project"]
-      print(f"APP_NAME={p['name']}")
-      print(f"VERSION={p['version']}")
-      PY
-    - cat build.env
-  artifacts:
-    reports:
-      dotenv: build.env
-
-kaniko_build:
-  stage: build
-  image:
-    name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [""]
-  script:
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/docker/Dockerfile"
-      --destination "${APP_NAME}:${VERSION}"
-      --no-push
+include:
+  - local: .ci/terraform.yml
+    rules:
+      - changes:
+          - infra/**/*
+  - local: .ci/app.yml
+    rules:
+      - changes:
+          - src/**/*
+          - docker/**/*

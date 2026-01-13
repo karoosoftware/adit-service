@@ -1,0 +1,58 @@
+stages:
+  - oidc_smoke
+
+oidc_smoke_preprod:
+  stage: oidc_smoke
+  image: alpine:3.20
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - when: never
+  variables:
+    AWS_REGION: eu-west-2
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PREPROD
+  before_script:
+    - apk add --no-cache aws-cli jq
+  script:
+    - echo "Assuming role: ${AWS_ROLE_ARN}"
+    - |
+      CREDS_JSON="$(aws sts assume-role-with-web-identity \
+        --role-arn "${AWS_ROLE_ARN}" \
+        --role-session-name "gitlab-${CI_PROJECT_PATH_SLUG}-${CI_PIPELINE_IID}" \
+        --web-identity-token "${GITLAB_OIDC_TOKEN}" \
+        --duration-seconds 3600)"
+    - export AWS_ACCESS_KEY_ID="$(echo "$CREDS_JSON" | jq -r '.Credentials.AccessKeyId')"
+    - export AWS_SECRET_ACCESS_KEY="$(echo "$CREDS_JSON" | jq -r '.Credentials.SecretAccessKey')"
+    - export AWS_SESSION_TOKEN="$(echo "$CREDS_JSON" | jq -r '.Credentials.SessionToken')"
+    - aws sts get-caller-identity
+
+oidc_smoke_prod:
+  stage: oidc_smoke
+  image: alpine:3.20
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      when: on_success
+    - when: never
+  variables:
+    AWS_REGION: eu-west-2
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PROD
+  before_script:
+    - apk add --no-cache aws-cli jq
+  script:
+    - echo "Assuming role: ${AWS_ROLE_ARN}"
+    - |
+      CREDS_JSON="$(aws sts assume-role-with-web-identity \
+        --role-arn "${AWS_ROLE_ARN}" \
+        --role-session-name "gitlab-${CI_PROJECT_PATH_SLUG}-${CI_PIPELINE_IID}" \
+        --web-identity-token "${GITLAB_OIDC_TOKEN}" \
+        --duration-seconds 3600)"
+    - export AWS_ACCESS_KEY_ID="$(echo "$CREDS_JSON" | jq -r '.Credentials.AccessKeyId')"
+    - export AWS_SECRET_ACCESS_KEY="$(echo "$CREDS_JSON" | jq -r '.Credentials.SecretAccessKey')"
+    - export AWS_SESSION_TOKEN="$(echo "$CREDS_JSON" | jq -r '.Credentials.SessionToken')"
+    - aws sts get-caller-identity
