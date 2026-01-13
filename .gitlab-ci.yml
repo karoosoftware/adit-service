@@ -3,6 +3,7 @@ stages:
   - build
 
 meta:
+  stage: meta
   image: python:3.12-alpine
   script:
     - |
