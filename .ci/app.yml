@@ -137,8 +137,12 @@ promote_to_prod:
     # Build auth for both registries
     - mkdir -p /tmp/auth
     - |
+      set -euo pipefail
+
       PREPROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
       PROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
+
+      # IMPORTANT: auths keys must be registry hostnames, not image names
       cat > /tmp/auth/auth.json <<EOF
       {
         "auths": {
@@ -147,6 +151,10 @@ promote_to_prod:
         }
       }
       EOF
+
+      echo "Authfile created for:"
+      jq -r '.auths | keys[]' /tmp/auth/auth.json
+
 
     # Copy layers + manifest
     - skopeo copy --authfile /tmp/auth/auth.json "docker://${SRC_IMAGE}" "docker://${DST_IMAGE}"
