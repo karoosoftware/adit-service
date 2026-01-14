@@ -67,7 +67,6 @@ kaniko_build_preprod:
     entrypoint: [""]
   extends:
     - .app_rules_develop
-    - .aws_oidc_auth
   variables:
     AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PREPROD
   needs: ["meta", "ecr_auth_preprod"]
