@@ -4,6 +4,7 @@ stages:
   - tf_plan
   - tf_apply
 
+
 # -----------------------
 # Shared Terraform config
 # -----------------------
