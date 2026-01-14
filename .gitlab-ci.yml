@@ -1,3 +1,12 @@
+stages:
+  - tf_fmt
+  - tf_validate
+  - tf_plan
+  - tf_apply
+  - meta
+  - test
+  - build
+
 include:
   - local: .ci/terraform.yml
     rules:

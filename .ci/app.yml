@@ -1,8 +1,3 @@
-stages:
-  - meta
-  - test
-  - build
-
 # Reusable rules so each job only runs on develop
 .app_rules_develop:
   rules:
