@@ -1,5 +1,5 @@
 locals {
-  preprod_sub   = "project_path:${var.gitlab_project_path}:ref_type:branch:ref:${var.preprod_branch}"
+  preprod_sub = "project_path:${var.gitlab_project_path}:ref_type:branch:ref:${var.preprod_branch}"
 }
 
 module "ecr" {
@@ -11,8 +11,8 @@ module "ecr" {
   image_tag_mutability = "MUTABLE"
   encryption_type      = "AES256"
 
-  create_gitlab_push_role   = true
-  gitlab_role_name          = "gitlab-ecr-preprod"
-  gitlab_oidc_provider_arn  = "arn:aws:iam::992468223519:oidc-provider/gitlab.com"
-  gitlab_sub                = local.preprod_sub
+  create_gitlab_push_role  = true
+  gitlab_role_name         = "gitlab-ecr-preprod"
+  gitlab_oidc_provider_arn = "arn:aws:iam::992468223519:oidc-provider/gitlab.com"
+  gitlab_sub               = local.preprod_sub
 }
