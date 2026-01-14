@@ -70,7 +70,3 @@ resource "aws_iam_role_policy_attachment" "gitlab_ecr_preprod_attach" {
   policy_arn = aws_iam_policy.gitlab_ecr_push_preprod.arn
 }
 
-output "aws_role_arn_ecr_preprod" {
-  value       = aws_iam_role.gitlab_ecr_preprod.arn
-  description = "Assume-role ARN for GitLab develop/preprod pipeline to push to preprod ECR"
-}
