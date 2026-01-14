@@ -8,8 +8,9 @@ stages:
 # Shared Terraform config
 # -----------------------
 .tf_common:
-  image: hashicorp/terraform:1.7.5
-  entrypoint: [""]
+  image:
+    name: hashicorp/terraform:1.7.5
+    entrypoint: [""]
   variables:
     TF_IN_AUTOMATION: "true"
     TF_INPUT: "false"
