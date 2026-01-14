@@ -1,4 +1,3 @@
-
 variables:
   AWS_REGION: eu-west-2
   PREPROD_ECR_REGISTRY: "${AWS_ACCOUNT_ID_PREPROD}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -64,12 +63,12 @@ kaniko_build_preprod:
   stage: build
   image:
     name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [""]
+    entrypoint: [ "" ]
   extends:
     - .app_rules_develop
   variables:
     AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PREPROD
-  needs: ["meta", "ecr_auth_preprod"]
+  needs: [ "meta", "ecr_auth_preprod" ]
   script:
     # authenticate kaniko to ECR
     - mkdir -p /kaniko/.docker
@@ -106,7 +105,7 @@ kaniko_build_preprod:
 
 promote_to_prod:
   stage: promote
-  image: alpine:3.20
+  image: quay.io/skopeo/stable:latest
   extends:
     - .app_rules_tag_v
     - .aws_oidc_auth
@@ -114,41 +113,43 @@ promote_to_prod:
     AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PROD_PROMOTE
     AWS_REGION: eu-west-2
   script:
+    # skopeo image already has skopeo; we just need aws-cli + jq for auth + checks
     - apk add --no-cache aws-cli jq
 
-    # Copy manifest from preprod:<sha> to prod:<tag> without rebuilding
+    - set -euo pipefail
+
+    - SRC_TAG="${CI_COMMIT_SHA}"
+    - DST_TAG="${CI_COMMIT_TAG}"
+
+    - SRC_IMAGE="${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${SRC_TAG}"
+    - DST_IMAGE="${PROD_ECR_REGISTRY}/${PROD_ECR_REPO}:${DST_TAG}"
+
+    - echo "Promoting (copy blobs, no rebuild) - ${SRC_IMAGE} -> ${DST_IMAGE}"
+
+    # Build an authfile containing both registries
+    - mkdir -p /tmp/auth
     - |
-      SRC_TAG="${CI_COMMIT_SHA}"
-      DST_TAG="${CI_COMMIT_TAG}"
+      PREPROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
+      PROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
+      cat > /tmp/auth/auth.json <<EOF
+      {
+        "auths": {
+          "${PREPROD_ECR_REGISTRY}": { "username": "AWS", "password": "${PREPROD_TOKEN}" },
+          "${PROD_ECR_REGISTRY}":    { "username": "AWS", "password": "${PROD_TOKEN}" }
+        }
+      }
+      EOF
 
-      set -euo pipefail
-  
-      echo "Promoting ${PREPROD_ECR_REPO}:${SRC_TAG} -> ${PROD_ECR_REPO}:${DST_TAG}"
-      
-      RESP="$(aws ecr batch-get-image \
+    # Optional: fail fast if source tag does not exist
+    - |
+      aws ecr describe-images \
         --region "${AWS_REGION}" \
+        --registry-id "${AWS_ACCOUNT_ID_PREPROD}" \
         --repository-name "${PREPROD_ECR_REPO}" \
-        --image-ids imageTag="${SRC_TAG}" \
-        --query '{manifest: images[0].imageManifest, failures: failures}' \
-        --output json)"
-        
-        MANIFEST="$(echo "$RESP" | jq -r '.manifest // empty')"
-        FAIL_REASON="$(echo "$RESP" | jq -r '.failures[0].failureReason // empty')"
-        
-        if [ -z "$MANIFEST" ]; then
-          echo "ERROR: Source image not promotable (missing manifest)."
-          if [ -n "$FAIL_REASON" ]; then
-            echo "Reason: $FAIL_REASON"
-          else
-            echo "Reason: image tag not found in ${PREPROD_ECR_REPO}:${SRC_TAG}"
-          fi
-              exit 1
-        fi
+        --image-ids imageTag="${SRC_TAG}" >/dev/null
 
-      aws ecr put-image \
-        --region "${AWS_REGION}" \
-        --repository-name "${PROD_ECR_REPO}" \
-        --image-tag "${DST_TAG}" \
-        --image-manifest "${MANIFEST}"
+    # Copy image (layers + manifest) registry->registry
+    - skopeo copy --authfile /tmp/auth/auth.json "docker://${SRC_IMAGE}" "docker://${DST_IMAGE}"
 
-      echo "Done."
+    - echo "Promotion complete."
+
