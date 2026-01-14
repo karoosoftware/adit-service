@@ -45,7 +45,7 @@ ecr_auth_preprod:
     - .app_rules_develop
     - .aws_oidc_auth
   variables:
-    AWS_ROLE_ARN: $AWS_ROLE_ARN_PREPROD
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PREPROD
     AWS_REGION: eu-west-2
   script:
     - mkdir -p kaniko_docker
