@@ -170,5 +170,56 @@ resource "aws_iam_role" "gitlab_tf_prod" {
   })
 }
 
-# NOTE: Intentionally no permissions attached yet.
-# OIDC smoke test only needs sts:GetCallerIdentity, which works without extra IAM permissions.
+# ---------------------------------------------
+# Allow TF runner roles to manage gitlab-ecr-* IAM
+# (needed because app/IAM resources are created by Terraform runs)
+# ---------------------------------------------
+data "aws_iam_policy_document" "tf_manage_gitlab_ecr_iam" {
+  statement {
+    sid    = "ManageGitlabEcrRolesPolicies"
+    effect = "Allow"
+    actions = [
+      # Required for terraform plan/refresh
+      "iam:GetRole",
+      "iam:GetPolicy",
+      "iam:GetPolicyVersion",
+      "iam:ListPolicyVersions",
+      "iam:ListAttachedRolePolicies",
+
+      # Required for apply (create/update/delete)
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
+
+      "iam:CreatePolicy",
+      "iam:DeletePolicy",
+      "iam:CreatePolicyVersion",
+      "iam:DeletePolicyVersion",
+      "iam:SetDefaultPolicyVersion",
+
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy"
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gitlab-ecr-*",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/gitlab-ecr-*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "gitlab_tf_manage_gitlab_ecr_iam" {
+  name   = "gitlab-tf-manage-gitlab-ecr-iam"
+  policy = data.aws_iam_policy_document.tf_manage_gitlab_ecr_iam.json
+}
+
+resource "aws_iam_role_policy_attachment" "preprod_manage_gitlab_ecr_iam" {
+  role       = aws_iam_role.gitlab_tf_preprod.name
+  policy_arn = aws_iam_policy.gitlab_tf_manage_gitlab_ecr_iam.arn
+}
+
+resource "aws_iam_role_policy_attachment" "prod_manage_gitlab_ecr_iam" {
+  role       = aws_iam_role.gitlab_tf_prod.name
+  policy_arn = aws_iam_policy.gitlab_tf_manage_gitlab_ecr_iam.arn
+}

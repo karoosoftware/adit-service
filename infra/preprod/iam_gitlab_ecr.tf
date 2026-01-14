@@ -6,7 +6,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  federated            = "arn:aws:iam::992468223519:oidc-provider/gitlab.com"
+  federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/gitlab.com"
   gitlab_audience      = "https://gitlab.com"
   preprod_ecr_repo_arn = "arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/adit-service-preprod"
 }
