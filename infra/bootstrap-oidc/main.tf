@@ -175,6 +175,18 @@ resource "aws_iam_role" "gitlab_tf_prod" {
 # (needed because app/IAM resources are created by Terraform runs)
 # ---------------------------------------------
 data "aws_iam_policy_document" "tf_manage_gitlab_ecr_iam" {
+
+  statement {
+    sid    = "ReadInstanceProfilesForGitlabEcrRoles"
+    effect = "Allow"
+    actions = [
+      "iam:ListInstanceProfilesForRole",
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gitlab-ecr-*"
+    ]
+  }
+
   statement {
     sid    = "ManageGitlabEcrRolesPolicies"
     effect = "Allow"
@@ -202,7 +214,8 @@ data "aws_iam_policy_document" "tf_manage_gitlab_ecr_iam" {
       "iam:SetDefaultPolicyVersion",
 
       "iam:AttachRolePolicy",
-      "iam:DetachRolePolicy"
+      "iam:DetachRolePolicy",
+      "iam:ListInstanceProfilesForRole",
     ]
     resources = [
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gitlab-ecr-*",
