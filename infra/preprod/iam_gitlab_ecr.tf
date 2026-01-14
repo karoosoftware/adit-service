@@ -6,12 +6,9 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
+  federated            = "arn:aws:iam::992468223519:oidc-provider/gitlab.com"
   gitlab_audience      = "https://gitlab.com"
   preprod_ecr_repo_arn = "arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/adit-service-preprod"
-}
-
-data "aws_iam_openid_connect_provider" "gitlab" {
-  url = "https://gitlab.com"
 }
 
 data "aws_iam_policy_document" "gitlab_ecr_push_preprod" {
@@ -56,7 +53,7 @@ resource "aws_iam_role" "gitlab_ecr_preprod" {
       Effect = "Allow"
       Action = "sts:AssumeRoleWithWebIdentity"
       Principal = {
-        Federated = data.aws_iam_openid_connect_provider.gitlab.arn
+        Federated = local.federated
       }
       Condition = {
         StringEquals = {
