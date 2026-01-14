@@ -56,11 +56,13 @@ tf_fmt_preprod:
 
 tf_validate_preprod:
   stage: tf_validate
-  extends: .tf_common
+  extends: [.tf_common, .aws_oidc_auth]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: on_success
     - when: never
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PREPROD
   script:
     - cd infra/preprod
     - terraform init -input=false
@@ -117,11 +119,13 @@ tf_fmt_prod:
 
 tf_validate_prod:
   stage: tf_validate
-  extends: .tf_common
+  extends: [.tf_common, .aws_oidc_auth]
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v.*/'
       when: on_success
     - when: never
+  variables:
+      AWS_ROLE_ARN: $AWS_ROLE_ARN_PROD
   script:
     - cd infra/prod
     - terraform init -input=false
