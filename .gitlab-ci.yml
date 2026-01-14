@@ -11,18 +11,18 @@ stages:
 include:
   - local: .ci/aws-oidc.yml
 
-  - local: .ci/terraform.yml
-    rules:
-      # Run Terraform on tags ONLY if infra/terraform files changed in that commit
-      - if: '$CI_COMMIT_TAG =~ /^v.*/'
-        changes:
-          - infra/**/*
-          - .ci/terraform.yml
-
-      # Still run Terraform on branch commits when infra changes
-      - changes:
-          - infra/**/*
-          - .ci/terraform.yml
+#  - local: .ci/terraform.yml
+#    rules:
+#      # Run Terraform on tags ONLY if infra/terraform files changed in that commit
+#      - if: '$CI_COMMIT_TAG =~ /^v.*/'
+#        changes:
+#          - infra/**/*
+#          - .ci/terraform.yml
+#
+#      # Still run Terraform on branch commits when infra changes
+#      - changes:
+#          - infra/**/*
+#          - .ci/terraform.yml
 
   - local: .ci/app.yml
     rules:

@@ -141,13 +141,16 @@ promote_to_prod:
 
       PREPROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
       PROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
-
-      # IMPORTANT: auths keys must be registry hostnames, not image names
+  
+      # containers auth.json uses base64("user:pass") in the "auth" field
+      PREPROD_AUTH="$(printf 'AWS:%s' "${PREPROD_TOKEN}" | base64 | tr -d '\n')"
+      PROD_AUTH="$(printf 'AWS:%s' "${PROD_TOKEN}" | base64 | tr -d '\n')"
+  
       cat > /tmp/auth/auth.json <<EOF
       {
         "auths": {
-          "${PREPROD_ECR_REGISTRY}": { "username": "AWS", "password": "${PREPROD_TOKEN}" },
-          "${PROD_ECR_REGISTRY}":    { "username": "AWS", "password": "${PROD_TOKEN}" }
+          "${PREPROD_ECR_REGISTRY}": { "auth": "${PREPROD_AUTH}" },
+          "${PROD_ECR_REGISTRY}":    { "auth": "${PROD_AUTH}" }
         }
       }
       EOF
