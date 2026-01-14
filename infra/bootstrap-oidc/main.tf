@@ -2,7 +2,7 @@ locals {
   gitlab_issuer_url = "https://gitlab.com"
   gitlab_audience   = "https://gitlab.com"
 
-  preprod_sub = "project_path:${var.gitlab_project_path}:ref_type:branch:ref:${var.preprod_branch}"
+  preprod_sub   = "project_path:${var.gitlab_project_path}:ref_type:branch:ref:${var.preprod_branch}"
   prod_sub_like = "project_path:${var.gitlab_project_path}:ref_type:tag:ref:${var.prod_tag_prefix}*"
 }
 
@@ -20,8 +20,8 @@ data "aws_iam_policy_document" "terraform_backend" {
   }
 
   statement {
-    sid     = "TerraformStateObjectRW"
-    effect  = "Allow"
+    sid    = "TerraformStateObjectRW"
+    effect = "Allow"
     actions = [
       "s3:GetObject",
       "s3:PutObject",
@@ -33,8 +33,8 @@ data "aws_iam_policy_document" "terraform_backend" {
   }
 
   statement {
-    sid     = "TerraformLockTableRW"
-    effect  = "Allow"
+    sid    = "TerraformLockTableRW"
+    effect = "Allow"
     actions = [
       "dynamodb:GetItem",
       "dynamodb:PutItem",
