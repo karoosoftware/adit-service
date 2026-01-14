@@ -41,6 +41,7 @@ data "aws_iam_policy_document" "gitlab_ecr_promote_prod" {
     sid    = "PushToProdRepo"
     effect = "Allow"
     actions = [
+      "ecr:BatchCheckLayerAvailability",
       "ecr:InitiateLayerUpload",
       "ecr:UploadLayerPart",
       "ecr:CompleteLayerUpload",
