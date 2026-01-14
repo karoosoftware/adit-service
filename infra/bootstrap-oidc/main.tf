@@ -185,6 +185,8 @@ data "aws_iam_policy_document" "tf_manage_gitlab_ecr_iam" {
       "iam:GetPolicyVersion",
       "iam:ListPolicyVersions",
       "iam:ListAttachedRolePolicies",
+      "iam:ListRolePolicies",
+      "iam:GetRolePolicy",
 
       # Required for apply (create/update/delete)
       "iam:CreateRole",
