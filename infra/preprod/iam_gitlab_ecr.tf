@@ -8,8 +8,6 @@ data "aws_region" "current" {}
 locals {
   gitlab_audience      = "https://gitlab.com"
   preprod_ecr_repo_arn = "arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/adit-service-preprod"
-  preprod_sub          = "project_path:${var.gitlab_project_path}:ref_type:branch:ref:${var.preprod_branch}"
-
 }
 
 data "aws_iam_openid_connect_provider" "gitlab" {
