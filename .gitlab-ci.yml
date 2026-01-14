@@ -4,11 +4,9 @@ include:
       - changes:
           - infra/**/*
           - .ci/terraform.yml
-          - .gitlab-ci.yml
   - local: .ci/app.yml
     rules:
       - changes:
           - src/**/*
           - docker/**/*
           - .ci/app.yml
-          - .gitlab-ci.yml
