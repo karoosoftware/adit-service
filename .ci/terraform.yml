@@ -1,0 +1,150 @@
+# -----------------------
+# Shared Terraform config
+# -----------------------
+.tf_common:
+  image:
+    name: hashicorp/terraform:1.7.5
+    entrypoint: [""]
+  variables:
+    TF_IN_AUTOMATION: "true"
+    TF_INPUT: "false"
+    AWS_REGION: eu-west-2
+  before_script:
+    - terraform --version
+
+# =======================
+# PREPROD (develop)
+# =======================
+
+tf_fmt_preprod:
+  stage: tf_fmt
+  extends: .tf_common
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - when: never
+  script:
+    - cd infra/preprod
+    - terraform fmt -check -recursive
+
+tf_validate_preprod:
+  stage: tf_validate
+  extends: [.tf_common, .aws_oidc_auth]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - when: never
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PREPROD
+  script:
+    - cd infra/preprod
+    - terraform init -input=false
+    - terraform validate
+
+tf_plan_preprod:
+  stage: tf_plan
+  extends: [.tf_common, .aws_oidc_auth]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - when: never
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PREPROD
+  script:
+    - cd infra/preprod
+    - terraform init -input=false
+    - terraform plan -out=tfplan
+  artifacts:
+    paths:
+      - infra/preprod/tfplan
+    expire_in: 1 day
+
+
+tf_apply_preprod:
+  stage: tf_apply
+  extends: [.tf_common, .aws_oidc_auth]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+    - when: never
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PREPROD
+  needs: ["tf_plan_preprod"]
+  script:
+    - cd infra/preprod
+    - terraform init -input=false
+    - terraform apply -auto-approve tfplan
+
+# =======================
+# PROD (tags v*)
+# =======================
+
+tf_fmt_prod:
+  stage: tf_fmt
+  extends: .tf_common
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
+      when: on_success
+    - when: never
+  script:
+    - cd infra/prod
+    - terraform fmt -check -recursive
+
+tf_validate_prod:
+  stage: tf_validate
+  extends: [.tf_common, .aws_oidc_auth]
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
+      when: on_success
+    - when: never
+  variables:
+      AWS_ROLE_ARN: $AWS_ROLE_ARN_PROD
+  script:
+    - cd infra/prod
+    - terraform init -input=false
+    - terraform validate
+
+tf_plan_prod:
+  stage: tf_plan
+  extends: [.tf_common, .aws_oidc_auth]
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
+      when: on_success
+    - when: never
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PROD
+  script:
+    - cd infra/prod
+    - terraform init -input=false
+    - terraform plan -out=tfplan
+  artifacts:
+    paths:
+      - infra/prod/tfplan
+    expire_in: 1 day
+
+tf_apply_prod:
+  stage: tf_apply
+  extends: [.tf_common, .aws_oidc_auth]
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
+      when: manual
+    - when: never
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_PROD
+  needs: ["tf_plan_prod"]
+  script:
+    - cd infra/prod
+    - terraform init -input=false
+    - terraform apply -auto-approve tfplan

@@ -1,8 +1,7 @@
-# app.py
+# app.py - Adding this to trigger a commit - 4
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from socketserver import ThreadingMixIn
 from concurrent.futures import ThreadPoolExecutor
-import time
 
 class Handler(BaseHTTPRequestHandler):
     def _send_text(self, status: int, text: str):
@@ -33,9 +32,11 @@ class ThreadPoolHTTPServer(ThreadingMixIn, HTTPServer):
     def process_request(self, request, client_address):
         self.executor.submit(self.process_request_thread, request, client_address)
 
+def create_server(host="0.0.0.0", port=8080):
+    return ThreadPoolHTTPServer((host, port), Handler)
 
 def main():
-    server = ThreadPoolHTTPServer(("0.0.0.0", 8080), Handler)
+    server = create_server("0.0.0.0", 8080)
     server.serve_forever()
 
 if __name__ == "__main__":

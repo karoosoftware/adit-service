@@ -1,0 +1,166 @@
+variables:
+  AWS_REGION: eu-west-2
+  PREPROD_ECR_REGISTRY: "${AWS_ACCOUNT_ID_PREPROD}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+  PROD_ECR_REGISTRY: "${AWS_ACCOUNT_ID_PROD}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+  PREPROD_ECR_REPO: "adit-service-preprod"
+  PROD_ECR_REPO: "adit-service-prod"
+
+.app_rules_develop:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - when: never
+
+unit_tests:
+  stage: test
+  image: python:3.12-alpine
+  extends: .app_rules_develop
+  script:
+    - pip install --no-cache-dir -e .
+    - pip install --no-cache-dir pytest
+    - pytest -v
+
+meta:
+  stage: meta
+  image: python:3.12-alpine
+  extends: .app_rules_develop
+  script:
+    - |
+      python - <<'PY' > build.env
+      import tomllib
+      p = tomllib.load(open("pyproject.toml","rb"))["project"]
+      print(f"APP_NAME={p['name']}")
+      print(f"VERSION={p['version']}")
+      PY
+    - cat build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+
+ecr_auth_preprod:
+  stage: build
+  image: alpine:3.20
+  extends:
+    - .app_rules_develop
+    - .aws_oidc_auth
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PREPROD
+    AWS_REGION: eu-west-2
+  script:
+    - mkdir -p kaniko_docker
+    - TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
+    - |
+      cat > kaniko_docker/config.json <<EOF
+      {"auths":{"${PREPROD_ECR_REGISTRY}":{"username":"AWS","password":"${TOKEN}"}}}
+      EOF
+  artifacts:
+    paths:
+      - kaniko_docker/config.json
+    expire_in: 1 hour
+
+
+kaniko_build_preprod:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  extends:
+    - .app_rules_develop
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PREPROD
+  needs: [ "meta", "ecr_auth_preprod" ]
+  script:
+    # authenticate kaniko to ECR
+    - mkdir -p /kaniko/.docker
+    - cp kaniko_docker/config.json /kaniko/.docker/config.json
+
+    # build + push to PREPROD only
+    - |
+      DEST_IMAGE="${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${CI_COMMIT_SHA}"
+      /kaniko/executor \
+        --context "${CI_PROJECT_DIR}" \
+        --dockerfile "${CI_PROJECT_DIR}/docker/Dockerfile" \
+        --destination "${DEST_IMAGE}" \
+        --destination "${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:develop" \
+        --digest-file image.digest
+
+    # export info for downstream jobs (optional)
+    - |
+      echo "APP_NAME=${APP_NAME}" >> build.env
+      echo "VERSION=${VERSION}" >> build.env
+      echo "SOURCE_IMAGE=${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${CI_COMMIT_SHA}" >> build.env
+      echo "IMAGE_DIGEST=$(cat image.digest)" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - image.digest
+    expire_in: 7 days
+
+.app_rules_tag_v:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      when: on_success
+    - when: never
+
+promote_to_prod:
+  stage: promote
+  image: alpine:3.20
+  extends:
+    - .app_rules_tag_v
+    - .aws_oidc_auth
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PROD_PROMOTE
+    AWS_REGION: eu-west-2
+  script:
+    - set -euo pipefail
+    - apk add --no-cache aws-cli jq skopeo
+
+    - SRC_TAG="${CI_COMMIT_SHA}"
+    - DST_TAG="${CI_COMMIT_TAG}"
+    - SRC_IMAGE="${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${SRC_TAG}"
+    - DST_IMAGE="${PROD_ECR_REGISTRY}/${PROD_ECR_REPO}:${DST_TAG}"
+
+    - echo "Promoting (copy blobs, no rebuild) - ${SRC_IMAGE} -> ${DST_IMAGE}"
+
+    # Nice failure if source tag doesn't exist in preprod
+    - |
+      if ! aws ecr describe-images \
+        --region "${AWS_REGION}" \
+        --registry-id "${AWS_ACCOUNT_ID_PREPROD}" \
+        --repository-name "${PREPROD_ECR_REPO}" \
+        --image-ids imageTag="${SRC_TAG}" >/dev/null 2>&1; then
+        echo "ERROR: Source image not found in PREPROD ECR: ${PREPROD_ECR_REPO}:${SRC_TAG}"
+        exit 1
+      fi
+
+    # Build auth for both registries
+    - mkdir -p /tmp/auth
+    - |
+      set -euo pipefail
+
+      PREPROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
+      PROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
+  
+      # containers auth.json uses base64("user:pass") in the "auth" field
+      PREPROD_AUTH="$(printf 'AWS:%s' "${PREPROD_TOKEN}" | base64 | tr -d '\n')"
+      PROD_AUTH="$(printf 'AWS:%s' "${PROD_TOKEN}" | base64 | tr -d '\n')"
+  
+      cat > /tmp/auth/auth.json <<EOF
+      {
+        "auths": {
+          "${PREPROD_ECR_REGISTRY}": { "auth": "${PREPROD_AUTH}" },
+          "${PROD_ECR_REGISTRY}":    { "auth": "${PROD_AUTH}" }
+        }
+      }
+      EOF
+
+      echo "Authfile created for:"
+      jq -r '.auths | keys[]' /tmp/auth/auth.json
+
+
+    # Copy layers + manifest
+    - skopeo copy --authfile /tmp/auth/auth.json "docker://${SRC_IMAGE}" "docker://${DST_IMAGE}"
+
+    - echo "Promotion complete."
+
