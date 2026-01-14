@@ -11,7 +11,6 @@ locals {
 
   prod_sub = "project_path:${var.gitlab_project_path}:ref_type:tag:ref:${var.prod_tag_prefix}*"
 
-  # Source repo (preprod) and destination repo (prod)
   preprod_ecr_repo_arn = "arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/${var.app_name}-preprod"
   prod_ecr_repo_arn    = "arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/${var.app_name}-prod"
 }
@@ -25,25 +24,30 @@ data "aws_iam_policy_document" "gitlab_ecr_promote_prod" {
   }
 
   statement {
-    sid    = "ReadManifestFromPreprod"
+    sid    = "PullFromPreprodRepo"
     effect = "Allow"
     actions = [
       "ecr:BatchGetImage",
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
       "ecr:DescribeImages",
-      "ecr:ListImages",
-      "ecr:DescribeRepositories"
+      "ecr:DescribeRepositories",
+      "ecr:ListImages"
     ]
     resources = [local.preprod_ecr_repo_arn]
   }
 
   statement {
-    sid    = "WriteManifestToProd"
+    sid    = "PushToProdRepo"
     effect = "Allow"
     actions = [
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload",
       "ecr:PutImage",
       "ecr:DescribeImages",
-      "ecr:ListImages",
-      "ecr:DescribeRepositories"
+      "ecr:DescribeRepositories",
+      "ecr:ListImages"
     ]
     resources = [local.prod_ecr_repo_arn]
   }
@@ -69,7 +73,6 @@ resource "aws_iam_role" "gitlab_ecr_promote_prod" {
         StringEquals = {
           "gitlab.com:aud" = local.gitlab_audience
         }
-        # IMPORTANT: wildcard => StringLike
         StringLike = {
           "gitlab.com:sub" = local.prod_sub
         }

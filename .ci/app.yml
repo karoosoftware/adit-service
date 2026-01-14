@@ -105,7 +105,7 @@ kaniko_build_preprod:
     - when: never
 
 promote_to_prod:
-  stage: build
+  stage: promote
   image: alpine:3.20
   extends:
     - .app_rules_tag_v
@@ -137,12 +137,12 @@ promote_to_prod:
         
         if [ -z "$MANIFEST" ]; then
           echo "ERROR: Source image not promotable (missing manifest)."
-        if [ -n "$FAIL_REASON" ]; then
-          echo "Reason: $FAIL_REASON"
-        else
-          echo "Reason: image tag not found in ${PREPROD_ECR_REPO}:${SRC_TAG}"
-        fi
-            exit 1
+          if [ -n "$FAIL_REASON" ]; then
+            echo "Reason: $FAIL_REASON"
+          else
+            echo "Reason: image tag not found in ${PREPROD_ECR_REPO}:${SRC_TAG}"
+          fi
+              exit 1
         fi
 
       aws ecr put-image \

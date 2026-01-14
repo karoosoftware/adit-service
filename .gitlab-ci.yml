@@ -6,6 +6,7 @@ stages:
   - meta
   - test
   - build
+  - promote
 
 include:
   - local: .ci/aws-oidc.yml
