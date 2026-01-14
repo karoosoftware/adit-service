@@ -35,6 +35,37 @@ variable "kms_key_arn" {
   default     = null
 }
 
+variable "create_gitlab_push_role" {
+  type        = bool
+  default     = false
+  description = "Whether to create a GitLab OIDC role allowed to push to this repo"
+}
+
+variable "gitlab_oidc_provider_arn" {
+  type        = string
+  default     = null
+  description = "ARN of the aws_iam_openid_connect_provider for GitLab"
+}
+
+variable "gitlab_audience" {
+  type        = string
+  default     = "https://gitlab.com"
+  description = "OIDC audience for GitLab"
+}
+
+variable "gitlab_sub" {
+  type        = string
+  default     = null
+  description = "Exact GitLab OIDC sub claim to allow (e.g. project_path:...:ref_type:branch:ref:develop)"
+}
+
+variable "gitlab_role_name" {
+  type        = string
+  default     = null
+  description = "Name for the GitLab push role"
+}
+
+
 variable "max_image_count" {
   description = "Expire images beyond this count. Set to 0 to disable lifecycle policy."
   type        = number
