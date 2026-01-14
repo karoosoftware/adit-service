@@ -126,19 +126,25 @@ promote_to_prod:
   
       echo "Promoting ${PREPROD_ECR_REPO}:${SRC_TAG} -> ${PROD_ECR_REPO}:${DST_TAG}"
       
-      MANIFEST="$(aws ecr batch-get-image \
-      --region "${AWS_REGION}" \
-      --repository-name "${PREPROD_ECR_REPO}" \
-      --image-ids imageTag="${SRC_TAG}" \
-      --query 'images[0].imageManifest' \
-      --output text 2>/tmp/batch_get_err || true)"
-      
-      if [ -z "${MANIFEST}" ] || [ "${MANIFEST}" = "None" ]; then
-        echo "ERROR: Could not fetch manifest for ${PREPROD_ECR_REPO}:${SRC_TAG}"
-        echo "AWS CLI error (if any):"
-        cat /tmp/batch_get_err || true
-        exit 1
-      fi
+      RESP="$(aws ecr batch-get-image \
+        --region "${AWS_REGION}" \
+        --repository-name "${PREPROD_ECR_REPO}" \
+        --image-ids imageTag="${SRC_TAG}" \
+        --query '{manifest: images[0].imageManifest, failures: failures}' \
+        --output json)"
+        
+        MANIFEST="$(echo "$RESP" | jq -r '.manifest // empty')"
+        FAIL_REASON="$(echo "$RESP" | jq -r '.failures[0].failureReason // empty')"
+        
+        if [ -z "$MANIFEST" ]; then
+          echo "ERROR: Source image not promotable (missing manifest)."
+        if [ -n "$FAIL_REASON" ]; then
+          echo "Reason: $FAIL_REASON"
+        else
+          echo "Reason: image tag not found in ${PREPROD_ECR_REPO}:${SRC_TAG}"
+        fi
+            exit 1
+        fi
 
       aws ecr put-image \
         --region "${AWS_REGION}" \
