@@ -136,9 +136,6 @@ Detailed documentation for the infrastructure, including Terraform projects, AWS
 For more details on the proposed future deployment model, see [docs/deployment-architecture.md](docs/deployment-architecture.md).
 
 ### Planned additions
-- Automated container builds
-- Smoke tests against the running container
-- Deployment via GitLab CI pipelines (e.g. pushing images to Amazon ECR)
 - **ECS Deployment**: Note that deployment to Amazon ECS (Elastic Container Service) has not been implemented yet and will be part of the next phase of the project.
 
 ---
@@ -225,52 +222,6 @@ This pipeline is built with a strong focus on auditability and security:
 - **Human Approval via Tags**: Promotion to production is triggered only by protected release tags, which serve as a record of human approval and release intent.
 - **End-to-End Traceability**: Git history, tag history, and CI logs provide a complete trace from code change → artifact → production deployment.
 - **IAM Role Separation**: Strict IAM role separation ensures that only approved workflows (and only on protected tags/branches) can affect production artifacts.
-
----
-
-## Future: Decoupled Deployment with AWS Step Functions
-
-To further enhance security and reliability, the deployment logic can be transitioned from GitLab CI into **AWS Step Functions**. In this model, the **existing `.gitlab-ci.yml` pipeline** remains the entry point and orchestrator of the developer workflow, but it delegates the heavy lifting of infrastructure changes and deployments to AWS-native services.
-
-This removes the need for GitLab to hold broad infrastructure permissions and allows for more complex orchestration (e.g., blue/green deployments, manual approvals within AWS, and automated rollbacks).
-
-### 1. Conceptual Architecture
-The existing GitLab CI jobs (like `tf_apply` or `promote_to_prod`) will be refactored to simply trigger an AWS Step Function execution. GitLab passes the necessary context (target environment, commit SHA, version) as input, and AWS handles the secure execution.
-
-### 2. Step-by-Step Implementation Flow
-
-#### Phase 1: Infrastructure Preparation
-1.  **Deployment State Machine**: Define a Step Function using Amazon States Language (ASL) that orchestrates:
-    - **Validation**: Checks if the ECR image exists for the given SHA.
-    - **Terraform Task**: Runs an AWS CodeBuild project to execute `terraform apply`.
-    - **ECS Update**: Updates the ECS Service with the new image.
-    - **Health Check**: Monitors the rollout and rolls back if the service fails to become healthy.
-2.  **IAM Refinement**: 
-    - Reduce the existing GitLab OIDC role permissions. It no longer needs broad Terraform or ECR access; it only needs `states:StartExecution`.
-    - Create a dedicated IAM role for the Step Function with permissions to trigger CodeBuild and update ECS.
-
-#### Phase 2: GitLab CI Refactoring
-1.  **Update `.gitlab-ci.yml`**: Replace the existing script blocks in `tf_apply` and `promote_to_prod` with a focused AWS CLI command:
-    ```bash
-    aws stepfunctions start-execution \
-      --state-machine-arn "arn:aws:states:..." \
-      --input "{\"environment\": \"prod\", \"sha\": \"$CI_COMMIT_SHA\", \"version\": \"$VERSION\"}"
-    ```
-2.  **Feedback Loop**: The GitLab job can either wait for the execution to complete (using `aws states describe-execution`) to provide immediate feedback in the CI logs, or use a Webhook/Lambda to report status back to GitLab.
-
-#### Phase 3: Orchestration Flow in AWS
-1.  **Trigger**: GitLab CI starts the Step Function.
-2.  **Execution**: 
-    - **State "Run Terraform"**: Step Function triggers CodeBuild. CodeBuild fetches the TF state and applies changes.
-    - **State "Promote Image"**: (For Prod) Step Function triggers a Lambda to run the image promotion logic.
-    - **State "Deploy ECS"**: Step Function updates the ECS service.
-    - **State "Wait for Health"**: Step Function polls the ECS service health.
-3.  **Outcome**: If any step fails, the Step Function enters a "Rollback" state, reverting the ECS service to the previous image and notifying the team.
-
-### 3. Benefits of this approach
-- **Least Privilege**: GitLab's security footprint is drastically reduced.
-- **Resilient Deployments**: AWS manages the deployment lifecycle; even if a GitLab runner times out, the deployment continues or rolls back safely.
-- **Consistency**: The same Step Function is used whether triggered by GitLab, a scheduled task, or an emergency manual trigger.
 
 ---
 

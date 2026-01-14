@@ -58,15 +58,7 @@ This gives the separation of concerns while keeping the current promotion flow w
 
 ## How to “Abstract ECS Away” Cleanly
 
-### 1. Add a small AWS “Deploy API”
-Choose one of the following implementation paths:
-
-#### Option 1: API Gateway + Lambda (Simple)
-- CI calls an HTTPS endpoint with the payload `{env, cluster, service, image}`.
-- Lambda updates the task definition and runs `ecs:updateService`.
-- Lambda (or a triggered Step Function) waits for stability.
-
-#### Option 2: API Gateway + Step Functions (Better Orchestration)
+API Gateway + Step Functions
 - API Gateway starts a Step Functions state machine.
 - **Steps**:
   1. Validate request.
@@ -84,7 +76,7 @@ Choose one of the following implementation paths:
 - **Protection**: The deploy API is protected by:
   - GitLab OIDC calling AWS (Best).
   - A scoped token (Acceptable), plus allowlist IPs and rate limiting.
-- **Isolation**: The Lambda/Step Function execution role is the only one authorized to update ECS.
+- **Isolation**: Step Function execution role is the only one authorized to update ECS.
 
 ---
 
