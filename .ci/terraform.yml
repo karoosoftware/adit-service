@@ -83,6 +83,7 @@ tf_plan_preprod:
       - infra/preprod/tfplan
     expire_in: 1 day
 
+
 tf_apply_preprod:
   stage: tf_apply
   extends: [.tf_common, .aws_oidc_auth]
