@@ -105,7 +105,9 @@ kaniko_build_preprod:
 
 promote_to_prod:
   stage: promote
-  image: quay.io/skopeo/stable:latest
+  image:
+    name: quay.io/skopeo/stable:latest
+    entrypoint: [""]
   extends:
     - .app_rules_tag_v
     - .aws_oidc_auth
