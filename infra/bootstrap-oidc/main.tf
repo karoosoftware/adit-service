@@ -6,6 +6,105 @@ locals {
   prod_sub_like = "project_path:${var.gitlab_project_path}:ref_type:tag:ref:${var.prod_tag_prefix}*"
 }
 
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+data "aws_iam_policy_document" "terraform_backend" {
+  statement {
+    sid     = "TerraformStateBucketList"
+    effect  = "Allow"
+    actions = ["s3:ListBucket"]
+    resources = [
+      "arn:aws:s3:::${var.tf_state_bucket_name}"
+    ]
+  }
+
+  statement {
+    sid     = "TerraformStateObjectRW"
+    effect  = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject"
+    ]
+    resources = [
+      "arn:aws:s3:::${var.tf_state_bucket_name}/*"
+    ]
+  }
+
+  statement {
+    sid     = "TerraformLockTableRW"
+    effect  = "Allow"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DescribeTable"
+    ]
+    resources = [
+      "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.tf_lock_table_name}"
+    ]
+  }
+}
+
+# Minimal ECR permissions to create/manage repos + lifecycle + policy
+data "aws_iam_policy_document" "ecr_manage" {
+  # Needed to create repositories and set policy/lifecycle
+  statement {
+    sid    = "ECRManageRepo"
+    effect = "Allow"
+    actions = [
+      "ecr:CreateRepository",
+      "ecr:DeleteRepository",
+      "ecr:DescribeRepositories",
+      "ecr:TagResource",
+      "ecr:UntagResource",
+      "ecr:ListTagsForResource",
+      "ecr:PutLifecyclePolicy",
+      "ecr:GetLifecyclePolicy",
+      "ecr:DeleteLifecyclePolicy",
+      "ecr:SetRepositoryPolicy",
+      "ecr:GetRepositoryPolicy",
+      "ecr:DeleteRepositoryPolicy",
+      "ecr:PutImageScanningConfiguration"
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "gitlab_tf_backend" {
+  name   = "gitlab-tf-backend"
+  policy = data.aws_iam_policy_document.terraform_backend.json
+}
+
+resource "aws_iam_policy" "gitlab_tf_ecr_manage" {
+  name   = "gitlab-tf-ecr-manage"
+  policy = data.aws_iam_policy_document.ecr_manage.json
+}
+
+# Attach policies to both roles
+resource "aws_iam_role_policy_attachment" "preprod_backend" {
+  role       = aws_iam_role.gitlab_tf_preprod.name
+  policy_arn = aws_iam_policy.gitlab_tf_backend.arn
+}
+
+resource "aws_iam_role_policy_attachment" "preprod_ecr" {
+  role       = aws_iam_role.gitlab_tf_preprod.name
+  policy_arn = aws_iam_policy.gitlab_tf_ecr_manage.arn
+}
+
+resource "aws_iam_role_policy_attachment" "prod_backend" {
+  role       = aws_iam_role.gitlab_tf_prod.name
+  policy_arn = aws_iam_policy.gitlab_tf_backend.arn
+}
+
+resource "aws_iam_role_policy_attachment" "prod_ecr" {
+  role       = aws_iam_role.gitlab_tf_prod.name
+  policy_arn = aws_iam_policy.gitlab_tf_ecr_manage.arn
+}
+
+
 # Terraform needs thumbprint_list for this resource; we can fetch the cert chain and compute it.
 data "tls_certificate" "gitlab" {
   url = local.gitlab_issuer_url

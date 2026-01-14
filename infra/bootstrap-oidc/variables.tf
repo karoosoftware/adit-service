@@ -21,3 +21,15 @@ variable "prod_tag_prefix" {
   type    = string
   default = "v"
 }
+
+variable "tf_state_bucket_name" {
+  type        = string
+  description = "S3 bucket name holding Terraform remote state"
+  default     = "adit-service-tf-state"
+}
+
+variable "tf_lock_table_name" {
+  type        = string
+  description = "DynamoDB table name used for Terraform state locking"
+  default     = "adit-service-terraform-locks"
+}
