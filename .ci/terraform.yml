@@ -84,6 +84,9 @@ tf_fmt_prod:
   extends: .tf_common
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
       when: on_success
     - when: never
   script:
@@ -95,6 +98,9 @@ tf_validate_prod:
   extends: [.tf_common, .aws_oidc_auth]
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
       when: on_success
     - when: never
   variables:
@@ -109,6 +115,9 @@ tf_plan_prod:
   extends: [.tf_common, .aws_oidc_auth]
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
       when: on_success
     - when: never
   variables:
@@ -127,6 +136,9 @@ tf_apply_prod:
   extends: [.tf_common, .aws_oidc_auth]
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      changes:
+        - infra/**/*
+        - .ci/terraform.yml
       when: manual
     - when: never
   variables:

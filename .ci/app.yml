@@ -105,9 +105,7 @@ kaniko_build_preprod:
 
 promote_to_prod:
   stage: promote
-  image:
-    name: quay.io/skopeo/stable:latest
-    entrypoint: [""]
+  image: alpine:3.20
   extends:
     - .app_rules_tag_v
     - .aws_oidc_auth
@@ -115,20 +113,28 @@ promote_to_prod:
     AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PROD_PROMOTE
     AWS_REGION: eu-west-2
   script:
-    # skopeo image already has skopeo; we just need aws-cli + jq for auth + checks
-    - apk add --no-cache aws-cli jq
-
     - set -euo pipefail
+    - apk add --no-cache aws-cli jq skopeo
 
     - SRC_TAG="${CI_COMMIT_SHA}"
     - DST_TAG="${CI_COMMIT_TAG}"
-
     - SRC_IMAGE="${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${SRC_TAG}"
     - DST_IMAGE="${PROD_ECR_REGISTRY}/${PROD_ECR_REPO}:${DST_TAG}"
 
     - echo "Promoting (copy blobs, no rebuild) - ${SRC_IMAGE} -> ${DST_IMAGE}"
 
-    # Build an authfile containing both registries
+    # Nice failure if source tag doesn't exist in preprod
+    - |
+      if ! aws ecr describe-images \
+        --region "${AWS_REGION}" \
+        --registry-id "${AWS_ACCOUNT_ID_PREPROD}" \
+        --repository-name "${PREPROD_ECR_REPO}" \
+        --image-ids imageTag="${SRC_TAG}" >/dev/null 2>&1; then
+        echo "ERROR: Source image not found in PREPROD ECR: ${PREPROD_ECR_REPO}:${SRC_TAG}"
+        exit 1
+      fi
+
+    # Build auth for both registries
     - mkdir -p /tmp/auth
     - |
       PREPROD_TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
@@ -142,15 +148,7 @@ promote_to_prod:
       }
       EOF
 
-    # Optional: fail fast if source tag does not exist
-    - |
-      aws ecr describe-images \
-        --region "${AWS_REGION}" \
-        --registry-id "${AWS_ACCOUNT_ID_PREPROD}" \
-        --repository-name "${PREPROD_ECR_REPO}" \
-        --image-ids imageTag="${SRC_TAG}" >/dev/null
-
-    # Copy image (layers + manifest) registry->registry
+    # Copy layers + manifest
     - skopeo copy --authfile /tmp/auth/auth.json "docker://${SRC_IMAGE}" "docker://${DST_IMAGE}"
 
     - echo "Promotion complete."
