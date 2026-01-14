@@ -1,4 +1,12 @@
-# Reusable rules so each job only runs on develop
+
+variables:
+  AWS_REGION: eu-west-2
+  # Example registry URIs - set these in GitLab CI variables or compute them
+  PREPROD_ECR_REGISTRY: "${AWS_ACCOUNT_ID_PREPROD}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+  PROD_ECR_REGISTRY: "${AWS_ACCOUNT_ID_PROD}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+  PREPROD_ECR_REPO: "adit-service-preprod"
+  PROD_ECR_REPO: "adit-service-prod"
+
 .app_rules_develop:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
@@ -31,16 +39,45 @@ meta:
     reports:
       dotenv: build.env
 
-kaniko_build:
+kaniko_build_preprod:
   stage: build
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  extends: .app_rules_develop
+  extends:
+    - .app_rules_develop
+    - .aws_oidc_auth
+  variables:
+    AWS_ROLE_ARN: $AWS_ROLE_ARN_ECR_PREPROD
   needs: ["meta"]
   script:
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/docker/Dockerfile"
-      --destination "${APP_NAME}:${VERSION}"
-      --no-push
+    # authenticate kaniko to ECR
+    - mkdir -p /kaniko/.docker
+    - |
+      TOKEN="$(aws ecr get-login-password --region "${AWS_REGION}")"
+      cat > /kaniko/.docker/config.json <<EOF
+      {"auths":{"${PREPROD_ECR_REGISTRY}":{"username":"AWS","password":"${TOKEN}"}}}
+      EOF
+
+    # build + push to PREPROD only
+    - |
+      DEST_IMAGE="${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${CI_COMMIT_SHA}"
+      /kaniko/executor \
+        --context "${CI_PROJECT_DIR}" \
+        --dockerfile "${CI_PROJECT_DIR}/docker/Dockerfile" \
+        --destination "${DEST_IMAGE}" \
+        --destination "${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:develop" \
+        --digest-file image.digest
+
+    # export info for downstream jobs (optional)
+    - |
+      echo "APP_NAME=${APP_NAME}" >> build.env
+      echo "VERSION=${VERSION}" >> build.env
+      echo "SOURCE_IMAGE=${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${CI_COMMIT_SHA}" >> build.env
+      echo "IMAGE_DIGEST=$(cat image.digest)" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - image.digest
+    expire_in: 7 days

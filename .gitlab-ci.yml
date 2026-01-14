@@ -8,6 +8,7 @@ stages:
   - build
 
 include:
+  - local: .ci/aws-oidc.yml
   - local: .ci/terraform.yml
     rules:
       - if: '$CI_COMMIT_TAG =~ /^v.*/'
