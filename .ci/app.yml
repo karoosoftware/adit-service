@@ -73,7 +73,7 @@ kaniko_build_preprod:
     # authenticate kaniko to ECR
     - mkdir -p /kaniko/.docker
     - cp kaniko_docker/config.json /kaniko/.docker/config.json
-    -
+
     # build + push to PREPROD only
     - |
       DEST_IMAGE="${PREPROD_ECR_REGISTRY}/${PREPROD_ECR_REPO}:${CI_COMMIT_SHA}"
